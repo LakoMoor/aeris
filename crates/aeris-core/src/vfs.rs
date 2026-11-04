@@ -40,12 +40,24 @@ impl Stamp {
 pub enum Kind {
     Dir,
     File(String),
+    /// A binary file (executables).
+    Bin(Vec<u8>),
 }
 
 #[derive(Clone, Debug)]
 pub struct Node {
     pub kind: Kind,
     pub stamp: Stamp,
+}
+
+impl Node {
+    pub fn size(&self) -> usize {
+        match &self.kind {
+            Kind::Dir => 0,
+            Kind::File(s) => s.len(),
+            Kind::Bin(b) => b.len(),
+        }
+    }
 }
 
 /// One row of a directory listing.
@@ -158,7 +170,7 @@ impl Vfs {
         matches!(self.map.get(p), Some(Node { kind: Kind::Dir, .. }))
     }
     pub fn is_file(&self, p: &str) -> bool {
-        matches!(self.map.get(p), Some(Node { kind: Kind::File(_), .. }))
+        matches!(self.map.get(p), Some(Node { kind: Kind::File(_) | Kind::Bin(_), .. }))
     }
 
     pub fn parent(p: &str) -> &str {
@@ -197,6 +209,10 @@ impl Vfs {
         let now = self.now;
         match self.map.get_mut(p) {
             Some(Node { kind: Kind::Dir, .. }) => Err(FsError::IsDir),
+            Some(Node { kind: Kind::Bin(_), stamp }) => {
+                let _ = stamp;
+                Err(FsError::Invalid)
+            }
             Some(Node { kind: Kind::File(s), stamp }) => {
                 if append {
                     s.push_str(data);
@@ -213,9 +229,33 @@ impl Vfs {
         }
     }
 
+    /// Store a binary file (creates or replaces).
+    pub fn write_bytes(&mut self, p: &str, data: &[u8]) -> Result<(), FsError> {
+        let par = Self::parent(p);
+        if !self.is_dir(par) {
+            return Err(if self.exists(par) { FsError::NotDir } else { FsError::NotFound });
+        }
+        if self.is_dir(p) {
+            return Err(FsError::IsDir);
+        }
+        self.map.insert(p.to_string(), Node { kind: Kind::Bin(data.to_vec()), stamp: self.now });
+        Ok(())
+    }
+
+    /// Raw bytes of any file.
+    pub fn read_bytes(&self, p: &str) -> Result<&[u8], FsError> {
+        match self.map.get(p) {
+            Some(Node { kind: Kind::File(s), .. }) => Ok(s.as_bytes()),
+            Some(Node { kind: Kind::Bin(b), .. }) => Ok(b),
+            Some(_) => Err(FsError::IsDir),
+            None => Err(FsError::NotFound),
+        }
+    }
+
     pub fn read(&self, p: &str) -> Result<&str, FsError> {
         match self.map.get(p) {
             Some(Node { kind: Kind::File(s), .. }) => Ok(s),
+            Some(Node { kind: Kind::Bin(_), .. }) => Err(FsError::Invalid),
             Some(_) => Err(FsError::IsDir),
             None => Err(FsError::NotFound),
         }
@@ -224,7 +264,7 @@ impl Vfs {
     pub fn list(&self, p: &str) -> Result<Vec<Entry>, FsError> {
         match self.map.get(p) {
             None => return Err(FsError::NotFound),
-            Some(Node { kind: Kind::File(_), .. }) => return Err(FsError::NotDir),
+            Some(Node { kind: Kind::File(_) | Kind::Bin(_), .. }) => return Err(FsError::NotDir),
             _ => {}
         }
         let prefix = if p == "/" { "/".to_string() } else { alloc::format!("{p}/") };
@@ -240,7 +280,7 @@ impl Vfs {
             out.push(Entry {
                 name: rest.to_string(),
                 is_dir: matches!(n.kind, Kind::Dir),
-                size: if let Kind::File(s) = &n.kind { s.len() } else { 0 },
+                size: n.size(),
                 stamp: n.stamp,
             });
         }
@@ -251,7 +291,7 @@ impl Vfs {
         self.map.get(p).map(|n| Entry {
             name: Self::basename(p).to_string(),
             is_dir: matches!(n.kind, Kind::Dir),
-            size: if let Kind::File(s) = &n.kind { s.len() } else { 0 },
+            size: n.size(),
             stamp: n.stamp,
         })
     }
@@ -299,8 +339,13 @@ impl Vfs {
             }
             Ok(())
         } else {
-            let data = self.read(from)?.to_string();
-            self.write(to, &data, false)
+            let mut node = self.map.get(from).cloned().ok_or(FsError::NotFound)?;
+            if !self.is_dir(Self::parent(to)) {
+                return Err(FsError::NotFound);
+            }
+            node.stamp = self.now;
+            self.map.insert(to.to_string(), node);
+            Ok(())
         }
     }
 
@@ -326,6 +371,7 @@ impl Vfs {
             let (kind, data): (u8, &[u8]) = match &n.kind {
                 Kind::Dir => (0, &[]),
                 Kind::File(s) => (1, s.as_bytes()),
+                Kind::Bin(b) => (2, b),
             };
             out.push(kind);
             out.extend_from_slice(&n.stamp.year.to_le_bytes());
@@ -358,7 +404,11 @@ impl Vfs {
             let stamp = Stamp { year, month: t[0], day: t[1], hour: t[2], minute: t[3], second: t[4] };
             let dl = u32::from_le_bytes(take(b, &mut at, 4)?.try_into().ok()?) as usize;
             let data = take(b, &mut at, dl)?;
-            let kind = if kind == 0 { Kind::Dir } else { Kind::File(core::str::from_utf8(data).ok()?.to_string()) };
+            let kind = match kind {
+                0 => Kind::Dir,
+                1 => Kind::File(core::str::from_utf8(data).ok()?.to_string()),
+                _ => Kind::Bin(data.to_vec()),
+            };
             map.insert(path, Node { kind, stamp });
         }
         if !map.contains_key("/") {
@@ -368,6 +418,6 @@ impl Vfs {
     }
 
     pub fn total_files(&self) -> usize {
-        self.map.values().filter(|n| matches!(n.kind, Kind::File(_))).count()
+        self.map.values().filter(|n| !matches!(n.kind, Kind::Dir)).count()
     }
 }

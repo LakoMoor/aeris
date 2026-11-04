@@ -12,8 +12,15 @@ fn main() {
     std::fs::create_dir_all(&out).unwrap();
     let bios = out.join("aeris-bios.img");
     let uefi = out.join("aeris-uefi.img");
-    bootloader::BiosBoot::new(&kernel).create_disk_image(&bios).expect("bios image");
-    bootloader::UefiBoot::new(&kernel).create_disk_image(&uefi).expect("uefi image");
+    let progs = pack_programs(&root, &out);
+    let mut bb = bootloader::BiosBoot::new(&kernel);
+    let mut ub = bootloader::UefiBoot::new(&kernel);
+    if let Some(p) = &progs {
+        bb.set_ramdisk(p);
+        ub.set_ramdisk(p);
+    }
+    bb.create_disk_image(&bios).expect("bios image");
+    ub.create_disk_image(&uefi).expect("uefi image");
     println!("BIOS image: {}\nUEFI image: {}", bios.display(), uefi.display());
     let data = out.join("aeris-data.img");
     if !data.exists() {
@@ -27,6 +34,32 @@ fn main() {
         "uefi" => qemu(&uefi, &data, true, extra),
         other => eprintln!("unknown command {other}; use build | run | uefi"),
     }
+}
+
+/// Pack `programs/*.exe` into a small archive; the kernel installs it into C:\Applications at boot.
+fn pack_programs(root: &Path, out: &Path) -> Option<PathBuf> {
+    let dir = root.join("programs");
+    let mut blob: Vec<u8> = Vec::new();
+    let mut names = Vec::new();
+    for e in std::fs::read_dir(&dir).ok()?.flatten() {
+        let p = e.path();
+        if p.extension().map_or(false, |x| x.eq_ignore_ascii_case("exe")) {
+            let name = p.file_name()?.to_string_lossy().to_string();
+            let data = std::fs::read(&p).ok()?;
+            blob.extend_from_slice(&(name.len() as u16).to_le_bytes());
+            blob.extend_from_slice(name.as_bytes());
+            blob.extend_from_slice(&(data.len() as u32).to_le_bytes());
+            blob.extend_from_slice(&data);
+            names.push(name);
+        }
+    }
+    if names.is_empty() {
+        return None;
+    }
+    println!("Programs: {}", names.join(", "));
+    let f = out.join("programs.bin");
+    std::fs::write(&f, blob).ok()?;
+    Some(f)
 }
 
 fn build_kernel(root: &Path) -> PathBuf {

@@ -45,10 +45,14 @@ process pages to user mode and implements a kernel32 subset (`GetStdHandle`, `Wr
 `WriteConsoleA`, `ExitProcess`, ...) behind `int 0x80` thunks. Try `hello.exe` in PowerShell or CMD,
 then `echo $LASTEXITCODE` / `echo %ERRORLEVEL%`. Rebuild the sample with
 `cd tests/win-hello && cargo build --release` (needs the MSVC linker).
-Limits: one process at a time, no preemption, programs are built into the kernel (no binary files in
-the RAM file system yet), only the kernel32 subset above. macOS arm64 (Mach-O) programs cannot run
-natively on an x86-64 CPU; that needs an AArch64 interpreter and is not implemented yet (typing a
-`.exe` in the zsh terminal reports `exec format error`).
+Programs live in `C:\Applications`. Drop any x86-64 console `.exe` into `programs/` and rebuild: the builder
+packs it into a ramdisk and the kernel installs it at boot (it is then saved on the data disk like any file).
+Run it by name from PowerShell or CMD; arguments reach `GetCommandLineA`. A 100 Hz timer watchdog terminates
+programs that use more than 15 s of CPU, and crashes (access violations) are caught.
+Limits: one process at a time, only the kernel32 subset above (no heap/file/GUI APIs, no msvcrt), and process
+pages are opened to ring 3 inside the kernel address space, so this is **not a security boundary**.
+macOS arm64 (Mach-O) programs cannot run natively on an x86-64 CPU; that needs an AArch64 interpreter and is not
+implemented yet (a `.exe` in the zsh terminal reports `exec format error`).
 
 ## Status
 

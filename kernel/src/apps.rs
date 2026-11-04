@@ -292,7 +292,7 @@ impl Terminal {
         let n = self.lines.len();
         self.lines.truncate(n.saturating_sub(1));
         self.lines.push((format!("{prompt}{line}"), 0));
-        let out = match crate::programs::try_run(&line, self.session.flavor) {
+        let out = match crate::programs::try_run(&line, self.session.flavor, ctx.vfs, &self.session.cwd) {
             Some((o, code)) => {
                 let var = if self.session.flavor == Flavor::PowerShell { "LASTEXITCODE" } else { "ERRORLEVEL" };
                 self.session.vars.insert(var.to_string(), code.to_string());

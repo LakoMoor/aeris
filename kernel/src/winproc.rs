@@ -43,6 +43,11 @@ static mut PROC_BASE: u64 = 0;
 static mut PROC_LEN: u64 = 0;
 #[no_mangle]
 static mut LAST_FAULT: bool = false;
+#[no_mangle]
+static mut LAST_TIMEOUT: bool = false;
+#[no_mangle]
+static mut TICKS: u64 = 0;
+static mut CMDLINE_PTR: u64 = 0;
 
 global_asm!(
     r#"
@@ -58,7 +63,7 @@ global_asm!(
         mov byte ptr [rip + IN_USER], 1
         push 0x1B
         push rsi
-        push 0x2
+        push 0x202
         push 0x23
         push rdi
         xor eax, eax
@@ -120,6 +125,34 @@ global_asm!(
         pop rbx
         ret
 
+    .global aeris_timer
+    aeris_timer:
+        push rax
+        mov al, 0x20
+        out 0x20, al
+        cmp byte ptr [rip + IN_USER], 0
+        je 5f
+        inc qword ptr [rip + TICKS]
+        cmp qword ptr [rip + TICKS], 1500
+        jb 5f
+        pop rax
+        mov byte ptr [rip + IN_USER], 0
+        mov eax, 0xC000013A
+        mov [rip + EXIT_CODE], rax
+        mov byte ptr [rip + LAST_TIMEOUT], 1
+        mov rsp, [rip + KSTACK_SAVE]
+        mov rax, [rip + EXIT_CODE]
+        pop r15
+        pop r14
+        pop r13
+        pop r12
+        pop rbp
+        pop rbx
+        ret
+    5:
+        pop rax
+        iretq
+
     .global aeris_fault
     aeris_fault:
         cmp byte ptr [rip + IN_USER], 0
@@ -150,6 +183,7 @@ extern "C" {
     fn aeris_enter_user(entry: u64, rsp: u64) -> u64;
     fn aeris_int80();
     fn aeris_fault();
+    fn aeris_timer();
 }
 
 #[no_mangle]
@@ -238,7 +272,8 @@ extern "C" fn aeris_syscall(r: &mut Regs) -> u64 {
         6 => r.rax = 4242,
         7 => r.rax = (crate::sys::ms() & 0xFFFF_FFFF) as u64,
         8 | 10 => r.rax = 1,
-        11 => r.rax = base + 0x10, // points at a NUL inside the image header region
+        // SAFETY: set before the process starts.
+        11 => r.rax = unsafe { CMDLINE_PTR },
         _ => r.rax = 0,
     }
     0
@@ -284,7 +319,23 @@ pub fn init(phys_offset: u64) {
         idt.alignment_check.set_handler_addr(f);
         idt.simd_floating_point.set_handler_addr(f);
         idt[0x80].set_handler_addr(VirtAddr::new(aeris_int80 as usize as u64)).set_privilege_level(PrivilegeLevel::Ring3);
+        idt[32].set_handler_addr(VirtAddr::new(aeris_timer as usize as u64));
         idt.load();
+        // Remap the PICs, let only the timer (IRQ0) through, PIT at 100 Hz (watchdog).
+        use crate::sys::outb;
+        outb(0x20, 0x11);
+        outb(0xA0, 0x11);
+        outb(0x21, 0x20);
+        outb(0xA1, 0x28);
+        outb(0x21, 4);
+        outb(0xA1, 2);
+        outb(0x21, 1);
+        outb(0xA1, 1);
+        outb(0x21, 0xFE);
+        outb(0xA1, 0xFF);
+        outb(0x43, 0x36);
+        outb(0x40, (11932u32 & 0xFF) as u8);
+        outb(0x40, (11932u32 >> 8) as u8);
     }
 }
 
@@ -339,10 +390,11 @@ pub struct Exit {
     pub code: u32,
     pub output: String,
     pub faulted: bool,
+    pub timed_out: bool,
 }
 
 /// Run a PE image to completion and return what it printed.
-pub fn run(exe: &[u8]) -> Result<Exit, String> {
+pub fn run(exe: &[u8], cmdline: &str) -> Result<Exit, String> {
     let pe = Pe::parse(exe).map_err(|e| match e {
         aeris_pe::PeError::Machine(m) => alloc::format!("unsupported machine type 0x{m:04x} (only x86-64 images run natively)"),
         aeris_pe::PeError::Not64Bit => "32-bit (PE32) programs are not supported".to_string(),
@@ -386,6 +438,9 @@ pub fn run(exe: &[u8]) -> Result<Exit, String> {
             t[6] = 0x80;
             t[7] = 0xC3; // ret
         }
+        let cl = cmdline.as_bytes();
+        let n = cl.len().min(PAGE - 1024 - 1);
+        thunks[1024..1024 + n].copy_from_slice(&cl[..n]);
         match r {
             Ok(e) => e,
             Err(e) => {
@@ -402,18 +457,22 @@ pub fn run(exe: &[u8]) -> Result<Exit, String> {
     let code = unsafe {
         PROC_BASE = base;
         PROC_LEN = total as u64;
+        CMDLINE_PTR = thunk_base + 1024;
+        TICKS = 0;
+        LAST_TIMEOUT = false;
         (*core::ptr::addr_of_mut!(OUT)).clear();
         LAST_FAULT = false;
         aeris_enter_user(entry, rsp)
     };
     // SAFETY: the process has ended; nothing references its memory any more.
-    let (output, faulted) = unsafe {
+    let (output, faulted, timed_out) = unsafe {
         let o = String::from_utf8_lossy(&*core::ptr::addr_of!(OUT)).to_string();
         let f = LAST_FAULT;
+        let t = LAST_TIMEOUT;
         PROC_BASE = 0;
         PROC_LEN = 0;
         dealloc(mem, layout);
-        (o, f)
+        (o, f, t)
     };
-    Ok(Exit { code: code as u32, output, faulted })
+    Ok(Exit { code: code as u32, output, faulted, timed_out })
 }

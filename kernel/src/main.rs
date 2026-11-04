@@ -175,6 +175,8 @@ fn kmain(bi: &'static mut BootInfo) -> ! {
     winproc::init(phys);
     log!("cpu tables ready, phys offset {:#x}", phys);
     log!("Aeris kernel starting");
+    let ram_addr = bi.ramdisk_addr.into_option();
+    let ram_len = bi.ramdisk_len;
     let fb = bi.framebuffer.as_mut().expect("no framebuffer");
     let info = fb.info();
     let (w, h) = (info.width as i32, info.height as i32);
@@ -249,7 +251,14 @@ fn kmain(bi: &'static mut BootInfo) -> ! {
     log!("setup done");
 
     // ---- desktop
-    let (st, vfs) = loaded.unwrap_or_else(|| (oobe.settings(), Vfs::new(sys::now())));
+    let (st, mut vfs) = loaded.unwrap_or_else(|| (oobe.settings(), Vfs::new(sys::now())));
+    vfs.now = sys::now();
+    let ramdisk: &[u8] = match (ram_addr, ram_len) {
+        // SAFETY: the bootloader maps the ramdisk at this address for `ram_len` bytes.
+        (Some(a), l) if l > 0 => unsafe { core::slice::from_raw_parts(a as *const u8, l as usize) },
+        _ => &[],
+    };
+    log!("installed {} programs", programs::install(&mut vfs, ramdisk));
     let mut desk = Desktop::new(w, h, st, vfs);
     let t = sys::now();
     let mut last_saved: alloc::vec::Vec<u8> = alloc::vec::Vec::new();

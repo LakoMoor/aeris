@@ -109,6 +109,18 @@ fn vfs_roundtrips_through_bytes() {
 }
 
 #[test]
+fn binary_files_roundtrip_and_list() {
+    let mut x = s(Flavor::Cmd);
+    x.vfs.write_bytes("/Applications/app.exe", &[0x4D, 0x5A, 0, 0xFF, 0x80]).unwrap();
+    assert_eq!(x.vfs.read_bytes("/Applications/app.exe").unwrap(), &[0x4D, 0x5A, 0, 0xFF, 0x80]);
+    let o = x.exec("dir C:/Applications");
+    assert!(o.out.contains("app.exe"), "{}", o.out);
+    assert!(!x.exec("type C:/Applications/app.exe").err.is_empty());
+    let y = vfs::Vfs::from_bytes(&x.vfs.to_bytes(), Stamp::default()).unwrap();
+    assert_eq!(y.read_bytes("/Applications/app.exe").unwrap().len(), 5);
+}
+
+#[test]
 fn weekday_is_right() {
     // 2026-11-04 is a Wednesday.
     assert_eq!(Stamp::new(2026, 11, 4, 0, 0).weekday(), 3);
