@@ -1,0 +1,14 @@
+[package]
+name = "win-hello"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[profile.release]
+panic = "abort"
+opt-level = "z"
+lto = true
+
+[profile.dev]
+panic = "abort"

@@ -11,10 +11,12 @@ mod gfx;
 mod icons;
 mod input;
 mod oobe;
+mod programs;
 mod storage;
 mod sys;
 mod theme;
 mod wallpaper;
+mod winproc;
 mod widgets;
 
 use aeris_core::vfs::Vfs;
@@ -37,6 +39,7 @@ static mut HEAP: [u8; HEAP_SIZE] = [0; HEAP_SIZE];
 pub static CONFIG: BootloaderConfig = {
     let mut c = BootloaderConfig::new_default();
     c.kernel_stack_size = 512 * 1024;
+    c.mappings.physical_memory = Some(bootloader_api::config::Mapping::Dynamic);
     c
 };
 entry_point!(kmain, config = &CONFIG);
@@ -168,6 +171,9 @@ fn kmain(bi: &'static mut BootInfo) -> ! {
         ALLOC.lock().init(core::ptr::addr_of_mut!(HEAP) as *mut u8, HEAP_SIZE);
     }
     sys::init_clock();
+    let phys = bi.physical_memory_offset.into_option().unwrap_or(0);
+    winproc::init(phys);
+    log!("cpu tables ready, phys offset {:#x}", phys);
     log!("Aeris kernel starting");
     let fb = bi.framebuffer.as_mut().expect("no framebuffer");
     let info = fb.info();

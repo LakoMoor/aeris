@@ -1,7 +1,8 @@
 [workspace]
 resolver = "2"
-members = ["crates/aeris-core", "kernel", "builder"]
+members = ["crates/aeris-core", "crates/aeris-pe", "kernel", "builder"]
 default-members = ["builder"]
+exclude = ["tests/win-hello"]
 
 [workspace.package]
 version = "0.1.0"

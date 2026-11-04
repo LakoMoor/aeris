@@ -292,7 +292,15 @@ impl Terminal {
         let n = self.lines.len();
         self.lines.truncate(n.saturating_sub(1));
         self.lines.push((format!("{prompt}{line}"), 0));
-        let out = self.with_session(ctx, |s| s.exec(&line));
+        let out = match crate::programs::try_run(&line, self.session.flavor) {
+            Some((o, code)) => {
+                let var = if self.session.flavor == Flavor::PowerShell { "LASTEXITCODE" } else { "ERRORLEVEL" };
+                self.session.vars.insert(var.to_string(), code.to_string());
+                self.session.history.push(line.clone());
+                o
+            }
+            None => self.with_session(ctx, |s| s.exec(&line)),
+        };
         if out.clear {
             self.lines.clear();
         }

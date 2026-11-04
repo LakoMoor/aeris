@@ -37,6 +37,19 @@ Prompts, error text and output formats follow each real shell: `dir` / `Get-Chil
 `>` / `>>`, variables (`$x`, `%X%`, `export`), `Select-String` / `findstr` / `grep`, `tree`,
 `neofetch`, tab completion and history. `cmd` / `powershell` / `pwsh` switch dialect, `exit` returns.
 
+## Running Windows programs
+
+Windows x86-64 (PE32+) console programs run **natively** in ring 3: `crates/aeris-pe` loads and
+relocates the image and binds imports; `kernel/src/winproc.rs` builds the GDT/TSS/IDT, opens the
+process pages to user mode and implements a kernel32 subset (`GetStdHandle`, `WriteFile`,
+`WriteConsoleA`, `ExitProcess`, ...) behind `int 0x80` thunks. Try `hello.exe` in PowerShell or CMD,
+then `echo $LASTEXITCODE` / `echo %ERRORLEVEL%`. Rebuild the sample with
+`cd tests/win-hello && cargo build --release` (needs the MSVC linker).
+Limits: one process at a time, no preemption, programs are built into the kernel (no binary files in
+the RAM file system yet), only the kernel32 subset above. macOS arm64 (Mach-O) programs cannot run
+natively on an x86-64 CPU; that needs an AArch64 interpreter and is not implemented yet (typing a
+`.exe` in the zsh terminal reports `exec format error`).
+
 ## Status
 
 Preview. Settings and files persist on a second (data) disk via an ATA PIO driver: `target/images/aeris-data.img`
