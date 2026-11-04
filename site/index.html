@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aeris OS — an operating system written in Rust</title>
+<meta name="description" content="Aeris is a bootable x86_64 operating system written in Rust. Pick a Windows 11 or macOS 27 style at setup, and use PowerShell, CMD or zsh in the terminal.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+:root{--bg:#07080d;--panel:#0e1017;--line:#1d212c;--text:#eef0f6;--dim:#9aa2b4;--a:#22d3ee;--b:#6366f1;--c:#a855f7}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+nav{position:sticky;top:0;z-index:5;backdrop-filter:blur(14px);background:rgba(7,8,13,.7);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;align-items:center;gap:28px;height:60px}
+nav img{width:28px;height:28px}nav b{font-weight:650;letter-spacing:.2px}
+nav .sp{flex:1}nav a.l{color:var(--dim);text-decoration:none;font-size:14px}nav a.l:hover{color:var(--text)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:999px;font-weight:600;font-size:15px;text-decoration:none;border:1px solid var(--line);background:var(--panel)}
+.btn.p{border:0;background:linear-gradient(120deg,var(--a),var(--b) 55%,var(--c));color:#fff}
+.hero{padding:84px 0 0;text-align:center;position:relative;overflow:hidden}
+.hero:before{content:"";position:absolute;inset:-200px -10% auto;height:640px;background:radial-gradient(40% 50% at 30% 40%,rgba(34,211,238,.18),transparent),radial-gradient(40% 50% at 70% 35%,rgba(168,85,247,.22),transparent);pointer-events:none}
+.hero h1{font-size:clamp(40px,7vw,76px);line-height:1.04;letter-spacing:-.03em;margin:22px 0 18px;font-weight:700}
+.grad{background:linear-gradient(120deg,var(--a),var(--b) 55%,var(--c));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p.s{max-width:660px;margin:0 auto 30px;color:var(--dim);font-size:19px}
+.hero .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.tabs{display:inline-flex;margin:54px 0 18px;padding:4px;border:1px solid var(--line);border-radius:999px;background:var(--panel);position:relative}
+.tabs button{all:unset;cursor:pointer;padding:9px 20px;border-radius:999px;font-size:14px;font-weight:600;color:var(--dim);position:relative;z-index:1}
+.tabs button.on{color:#fff;background:linear-gradient(120deg,var(--b),var(--c))}
+.shot{position:relative;margin:0 auto;max-width:1040px;border-radius:18px 18px 0 0;overflow:hidden;border:1px solid #2a2f3d;border-bottom:0;box-shadow:0 -10px 90px rgba(99,102,241,.25)}
+.shot img{display:block;width:100%;transition:opacity .35s}
+.shot img.b{position:absolute;inset:0;opacity:0}.shot.mac img.b{opacity:1}.shot.mac img.a{opacity:0}
+section{padding:96px 0}
+h2{font-size:clamp(30px,4.4vw,46px);letter-spacing:-.025em;line-height:1.1;margin:0 0 14px}
+.lead{color:var(--dim);max-width:640px;font-size:18px;margin:0 0 44px}
+.eyebrow{color:var(--a);font-weight:650;font-size:13px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+@media(max-width:860px){.two{grid-template-columns:1fr}}
+.term{background:#0b0d13;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.term .bar{display:flex;gap:8px;align-items:center;padding:10px 14px;background:#12151d;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
+.term .bar i{width:11px;height:11px;border-radius:50%;display:block}
+.term .tab{margin-left:auto;display:flex;gap:6px}
+.term .tab button{all:unset;cursor:pointer;padding:3px 10px;border-radius:6px;font-size:12px}
+.term .tab button.on{background:#232838;color:#fff}
+.term pre{margin:0;padding:18px;min-height:300px;font:13.5px/1.55 "JetBrains Mono",ui-monospace,Consolas,monospace;white-space:pre-wrap;transition:background .3s}
+.term pre.ps{background:#012456;color:#eeedf0}.term pre.cmd{background:#0c0c0c;color:#ccc}.term pre.zsh{background:#1e1e1e;color:#e8e8e8}
+.cur{display:inline-block;width:8px;height:15px;background:currentColor;vertical-align:-2px;animation:b 1s steps(1) infinite}@keyframes b{50%{opacity:0}}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+@media(max-width:860px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px}
+.card h3{margin:0 0 8px;font-size:18px}.card p{margin:0;color:var(--dim);font-size:15px}
+.ico{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--a),var(--b));margin-bottom:16px}
+.shots{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+@media(max-width:700px){.shots{grid-template-columns:1fr}}
+.shots figure{margin:0}.shots img{width:100%;border-radius:14px;border:1px solid var(--line);display:block}
+.shots figcaption{color:var(--dim);font-size:14px;margin-top:10px}
+pre.code{background:#0b0d13;border:1px solid var(--line);border-radius:14px;padding:20px;overflow:auto;font:13.5px/1.7 "JetBrains Mono",ui-monospace,Consolas,monospace;color:#cfd5e6}
+.k{color:#7dd3fc}.m{color:#6b7389}
+.status li{margin:8px 0;color:var(--dim)}.status b{color:var(--text)}
+footer{border-top:1px solid var(--line);padding:40px 0;color:var(--dim);font-size:14px}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <img src="assets/logo.svg" alt=""><b>Aeris</b><span class="sp"></span>
+  <a class="l" href="#experience">Experiences</a><a class="l" href="#terminal">Terminal</a><a class="l" href="#build">Build</a><a class="l" href="#status">Status</a>
+  <a class="btn" href="https://github.com/LakoMoor/aeris">GitHub</a>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <img src="assets/logo.svg" width="84" height="84" alt="Aeris logo">
+  <h1>An operating system<br><span class="grad">written in Rust.</span></h1>
+  <p class="s">Aeris boots on x86_64, draws its own desktop and ships its own shells. At setup you choose how it looks: <b>Windows 11</b> or <b>macOS 27</b>.</p>
+  <div class="cta"><a class="btn p" href="#build">Run it in QEMU</a><a class="btn" href="https://github.com/LakoMoor/aeris">View source</a></div>
+  <div class="tabs" id="tabs"><button class="on" data-m="win">Windows 11 style</button><button data-m="mac">macOS 27 style</button></div>
+  <div class="shot" id="shot"><img class="a" src="assets/win-start.png" alt="Aeris with the Windows 11 style desktop and Start menu"><img class="b" src="assets/mac-dock.png" alt="Aeris with the macOS 27 style desktop and Dock"></div>
+</div></header>
+
+<section id="experience"><div class="wrap">
+  <div class="eyebrow">Two experiences, one kernel</div>
+  <h2>Pick a look at setup. Change it live.</h2>
+  <p class="lead">Setup shows both desktops side by side. Settings › Personalization switches between them instantly, along with light/dark and six accent colours.</p>
+  <div class="shots">
+    <figure><img src="assets/setup.png" alt="Aeris Setup, choose your experience" loading="lazy"><figcaption>First-run Setup: Windows 11 style or macOS 27 style.</figcaption></figure>
+    <figure><img src="assets/mac-settings.png" alt="macOS style Settings, About page" loading="lazy"><figcaption>macOS style: menu bar, Dock, traffic lights, frosted glass.</figcaption></figure>
+    <figure><img src="assets/win-light.png" alt="Windows style PowerShell" loading="lazy"><figcaption>Windows style: centred taskbar, Start menu, Fluent title bars.</figcaption></figure>
+    <figure><img src="assets/win-dark-cmd.png" alt="Windows style dark mode with Command Prompt" loading="lazy"><figcaption>Dark mode with Command Prompt.</figcaption></figure>
+  </div>
+</div></section>
+
+<section id="terminal" style="padding-top:0"><div class="wrap two">
+  <div>
+    <div class="eyebrow">Three shells</div>
+    <h2>PowerShell, CMD and zsh. Same files.</h2>
+    <p class="lead" style="margin-bottom:20px">One in-memory file system, three dialects: prompts, error messages, <code>dir</code> vs <code>Get-ChildItem</code> vs <code>ls</code>, pipes, redirects, variables and tab completion. Type <code>cmd</code> or <code>pwsh</code> to switch; <code>exit</code> returns.</p>
+    <p class="lead" style="margin:0">The shell engine is a <code>no_std</code> crate with unit tests that run on your PC.</p>
+  </div>
+  <div class="term"><div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><span id="ttl">Windows PowerShell</span>
+    <span class="tab" id="tt"><button class="on" data-s="ps">PowerShell</button><button data-s="cmd">CMD</button><button data-s="zsh">zsh</button></span></div>
+    <pre id="tp" class="ps"></pre></div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="eyebrow">What is inside</div><h2>Small, readable, from scratch.</h2>
+  <p class="lead">Everything you see is drawn by the kernel: no browser, no toolkit, no images baked in.</p>
+  <div class="grid">
+    <div class="card"><div class="ico"></div><h3>Software compositor</h3><p>Anti-aliased rounded shapes, soft shadows, real blur for glass panels, Inter and JetBrains Mono rasterised with <code>ab_glyph</code>.</p></div>
+    <div class="card"><div class="ico"></div><h3>Window manager</h3><p>Drag, resize, minimise, maximise, focus, Alt+Tab. Taskbar and magnifying Dock are driven by the same app model.</p></div>
+    <div class="card"><div class="ico"></div><h3>Apps</h3><p>Terminal, Files, Settings and Notes. Double-click a file in Files and edit it in Notes; save with Ctrl+S.</p></div>
+    <div class="card"><div class="ico"></div><h3>PS/2 input</h3><p>Keyboard, mouse and scroll wheel, polled, with a software cursor drawn straight to the framebuffer.</p></div>
+    <div class="card"><div class="ico"></div><h3>BIOS and UEFI</h3><p>Boots through the <code>bootloader</code> crate from either firmware. Power off and restart work in QEMU.</p></div>
+    <div class="card"><div class="ico"></div><h3>Tested core</h3><p>File system and shell logic live in <code>aeris-core</code>, covered by <code>cargo test</code>.</p></div>
+  </div>
+</div></section>
+
+<section id="build" style="padding-top:0"><div class="wrap">
+  <div class="eyebrow">Try it</div><h2>Build and boot in one command.</h2>
+  <p class="lead">You need Rust nightly and QEMU. The builder compiles the kernel, produces BIOS and UEFI disk images and starts QEMU.</p>
+<pre class="code"><span class="m"># windows / linux / macOS</span>
+git clone https://github.com/LakoMoor/aeris &amp;&amp; cd aeris
+<span class="k">cargo run -p builder</span> -- run         <span class="m"># BIOS image in QEMU</span>
+<span class="k">cargo run -p builder</span> -- uefi        <span class="m"># UEFI image (needs OVMF)</span>
+<span class="k">cargo test -p aeris-core</span>              <span class="m"># shell + file system tests</span></pre>
+  <p class="lead" style="margin:18px 0 0">In QEMU click the window to capture the mouse; <b>Ctrl+Alt+G</b> releases it. Your data lives in <code>target/images/aeris-data.img</code>.</p>
+</div></section>
+
+<section id="status" style="padding-top:0"><div class="wrap">
+  <div class="eyebrow">Honest status</div><h2>A preview, not a daily driver.</h2>
+  <ul class="status" style="padding-left:20px;max-width:780px">
+    <li><b>Works today:</b> boot, Setup, both desktops, window manager, Terminal (3 dialects), Files, Settings, Notes, RTC clock, shutdown/restart.</li>
+    <li><b>Persistent:</b> settings and files are saved to a data disk (ATA PIO) and restored on the next boot, skipping Setup. Delete <code>aeris-data.img</code> to start over. Without a data disk everything stays in RAM.</li>
+    <li><b>Not yet:</b> USB and touchpad drivers, NVMe/AHCI, networking, audio, multi-core scheduling, running third-party programs.</li>
+    <li><b>Inspired, not copied:</b> the looks follow Windows 11 and macOS design language with original artwork. Aeris is not affiliated with Microsoft or Apple.</li>
+  </ul>
+</div></section>
+
+<footer><div class="wrap">Aeris OS · MIT licence · Fonts: Inter and JetBrains Mono (SIL OFL) · Architecture inspired by the Ferrix project.</div></footer>
+
+<script>
+const shot=document.getElementById('shot');
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  shot.classList.toggle('mac',b.dataset.m==='mac');
+});
+const S={
+ ps:{t:'Windows PowerShell',c:'ps',p:'PS C:\\Users\\aeris> ',s:[
+  ['Get-ChildItem','\n    Directory: C:\\Users\\aeris\n\nMode                 LastWriteTime         Length Name\n----                 -------------         ------ ----\nd-----        11/4/2026   2:36 PM                Documents\nd-----        11/4/2026   2:36 PM                Downloads\n'],
+  ['$who = "Aeris"; echo "Hello, $who"','Hello, Aeris\n'],
+  ['cat Documents/todo.txt | Select-String Rust','Documents/todo.txt:1:- write more Rust\n']]},
+ cmd:{t:'Command Prompt',c:'cmd',p:'C:\\Users\\aeris>',s:[
+  ['dir','Directory of C:\\Users\\aeris\n\n11/04/2026  02:36 PM    <DIR>          Documents\n11/04/2026  02:36 PM    <DIR>          Downloads\n               0 File(s)              0 bytes\n'],
+  ['type Documents\\readme.txt','Welcome to Aeris OS!\nThis is a Rust operating system.\n'],
+  ['frobnicate',"'frobnicate' is not recognized as an internal or external command,\noperable program or batch file.\n"]]},
+ zsh:{t:'Terminal — zsh',c:'zsh',p:'aeris@aeris-mac ~ % ',s:[
+  ['ls','Desktop    Documents  Downloads  Music      Pictures\n'],
+  ['echo hi > t.txt && cat t.txt','hi\n'],
+  ['frobnicate','zsh: command not found: frobnicate\n']]}
+};
+const pre=document.getElementById('tp'),ttl=document.getElementById('ttl');let run=0;
+async function play(k){const id=++run,d=S[k];pre.className=d.c;ttl.textContent=d.t;pre.innerHTML='';
+ const wait=ms=>new Promise(r=>setTimeout(r,ms));let out='';
+ while(id===run){for(const[cmd,res]of d.s){let typed='';
+   for(const ch of cmd){if(id!==run)return;typed+=ch;pre.textContent=out+d.p+typed;pre.append(Object.assign(document.createElement('span'),{className:'cur'}));await wait(32)}
+   await wait(300);out+=d.p+cmd+'\n'+res+(res.endsWith('\n')?'':'\n');pre.textContent=out+d.p;pre.append(Object.assign(document.createElement('span'),{className:'cur'}));await wait(1400)}
+  await wait(2200);out=''}}
+document.querySelectorAll('#tt button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#tt button').forEach(x=>x.classList.toggle('on',x===b));play(b.dataset.s)});
+play('ps');
+</script>
+</body>
+</html>
